@@ -39,6 +39,7 @@ int main(int argc, char* argv[])
 	}
 
 	chip8.LoadROM(argv[1]);
+	debugger.SetRomPath(argv[1]); // Set the initial ROM path in debugger
 	int videoPitch = sizeof(chip8.display[0]) * DISPLAY_WIDTH; // Assuming 32-bit pixels
 
 	auto lastCycleTime = std::chrono::high_resolution_clock::now();
@@ -90,13 +91,31 @@ int main(int argc, char* argv[])
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		
-		// Handle CPU cycles
-		float cpuDt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
-		if (cpuDt > cycleDelay)
-		{
-			lastCycleTime = currentTime;
-			
-			chip8.Cycle();
+		// Check for reset request
+		if (debugger.ShouldReset()) {
+			// Reset the CHIP-8 system
+			chip8 = Chip8();
+			// Reload the current ROM
+			const char* romPath = debugger.IsPaused() ? argv[1] : argv[1]; // Use debugger's ROM path if available
+			chip8.LoadROM(romPath);
+			debugger.ResetHandled();
+			continue; // Skip this frame to let reset complete
+		}
+		
+		// Handle CPU cycles (only if not paused)
+		if (!debugger.IsPaused()) {
+			float cpuDt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
+			if (cpuDt > cycleDelay) {
+				lastCycleTime = currentTime;
+				
+				// Execute one instruction
+				chip8.Cycle();
+				
+				// If in step mode, pause after executing one instruction
+				if (debugger.IsStepMode()) {
+					debugger.StepHandled(); // This will set step mode to false
+				}
+			}
 		}
 		
 		// Handle timers at 60Hz (independent of CPU speed)

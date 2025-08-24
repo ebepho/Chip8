@@ -7,7 +7,7 @@
 #include <iostream>
 #include <cstdio>
 
-Debugger::Debugger() : showRegisters(true), showMemory(true), showControls(true), showCPUState(true), showKeyboard(true), showDisassembly(true), showDisplay(true), renderer(nullptr), displayTexture(nullptr) {}
+Debugger::Debugger() : showRegisters(true), showMemory(true), showControls(true), showCPUState(true), showKeyboard(true), showDisassembly(true), showDisplay(true), renderer(nullptr), displayTexture(nullptr), isPaused(false), stepMode(false), shouldReset(false) {}
 
 bool Debugger::Init(SDL_Window* window, SDL_Renderer* sdlRenderer)
 {
@@ -243,13 +243,23 @@ void Debugger::RenderCPUState(Chip8& chip8)
     
     // Stack display
     ImGui::SeparatorText("Stack");
+    ImGui::Text("Stack Pointer: %d", chip8.sp);
+    
     if (chip8.sp > 0) {
-        ImGui::Text("Stack Top:");
-        for (int i = chip8.sp - 1; i >= 0 && i >= chip8.sp - 4; i--) {
-            ImGui::Text("  [%d]: 0x%04X", i, chip8.stack[i]);
+        ImGui::Text("Stack Contents:");
+        // Show stack entries (most recent first)
+        for (int i = chip8.sp - 1; i >= 0 && i >= chip8.sp - 8; i--) { // Show up to 8 entries
+            if (i == chip8.sp - 1) {
+                // Highlight the top of stack
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
+                ImGui::Text("  [%d]: 0x%04X (TOP)", i, chip8.stack[i]);
+                ImGui::PopStyleColor();
+            } else {
+                ImGui::Text("  [%d]: 0x%04X", i, chip8.stack[i]);
+            }
         }
-        if (chip8.sp > 4) {
-            ImGui::Text("  ... (%d more)", chip8.sp - 4);
+        if (chip8.sp > 8) {
+            ImGui::Text("  ... (%d more entries)", chip8.sp - 8);
         }
     } else {
         ImGui::TextDisabled("Stack empty");
@@ -384,28 +394,42 @@ void Debugger::RenderControls(Chip8& chip8)
 {
     ImGui::Begin("CHIP-8 - Controls", &showControls, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
     
-    static bool isPaused = false;
-    static bool stepMode = false;
-    
     ImGui::SeparatorText("Execution Control");
     
     // Main control buttons
     if (ImGui::Button("Reset", ImVec2(80, 30))) {
-        // Reset the chip8 system
-        chip8 = Chip8(); // This will call the constructor to reset
-        // TODO: Reload the current ROM
+        shouldReset = true;
+        isPaused = false; // Unpause when resetting
+        stepMode = false;
+        instructionHistory.clear(); // Clear instruction history on reset
     }
     
     ImGui::SameLine();
     if (ImGui::Button(isPaused ? "Resume" : "Pause", ImVec2(80, 30))) {
         isPaused = !isPaused;
-        // TODO: Implement pause functionality in main loop
+        stepMode = false; // Exit step mode when pausing/resuming
     }
     
     ImGui::SameLine();
     if (ImGui::Button("Step", ImVec2(80, 30))) {
-        // TODO: Execute one instruction
         stepMode = true;
+        isPaused = false; // Step implies we want to execute one instruction
+    }
+    
+    // Status indicators
+    ImGui::SeparatorText("Status");
+    if (isPaused) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
+        ImGui::Text("PAUSED");
+        ImGui::PopStyleColor();
+    } else if (stepMode) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 1.0f, 1.0f));
+        ImGui::Text("STEP MODE");
+        ImGui::PopStyleColor();
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+        ImGui::Text("RUNNING");
+        ImGui::PopStyleColor();
     }
     
     ImGui::SeparatorText("Emulation Settings");
@@ -419,12 +443,37 @@ void Debugger::RenderControls(Chip8& chip8)
     ImGui::SliderInt("##Scale", &displayScale, 1, 20);
     
     ImGui::SeparatorText("ROM Info");
-    static char romPath[256] = "No ROM loaded";
     ImGui::TextWrapped("Current ROM:");
-    ImGui::TextWrapped("%s", romPath);
+    if (!currentRomPath.empty()) {
+        // Extract just the filename from the path
+        size_t lastSlash = currentRomPath.find_last_of("/\\");
+        std::string filename = (lastSlash != std::string::npos) ? 
+                              currentRomPath.substr(lastSlash + 1) : currentRomPath;
+        ImGui::TextWrapped("%s", filename.c_str());
+    } else {
+        ImGui::TextDisabled("No ROM loaded");
+    }
     
     if (ImGui::Button("Load ROM", ImVec2(-1, 0))) {
         // TODO: Implement ROM file browser
+        ImGui::OpenPopup("Load ROM##popup");
+    }
+    
+    // Simple ROM selection popup (for now just show available ROMs)
+    if (ImGui::BeginPopup("Load ROM##popup")) {
+        ImGui::Text("Available ROMs:");
+        ImGui::Separator();
+        
+        // List some common ROMs (this could be improved with file system scanning)
+        const char* roms[] = {"IBMLOGO", "PONG", "TETRIS", "INVADERS", "BRIX", "MAZE"};
+        for (int i = 0; i < 6; i++) {
+            if (ImGui::Selectable(roms[i])) {
+                currentRomPath = std::string("../roms/") + roms[i];
+                shouldReset = true; // Trigger reset to load new ROM
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndPopup();
     }
     
     ImGui::End();
@@ -456,6 +505,9 @@ void Debugger::RenderKeyboard(Chip8& chip8)
     
     const int keyMap[16] = {0x1, 0x2, 0x3, 0xC, 0x4, 0x5, 0x6, 0xD, 0x7, 0x8, 0x9, 0xE, 0xA, 0x0, 0xB, 0xF};
     
+    // Track which key is currently being pressed by mouse
+    static int mouseDownKey = -1;
+    
     for (int row = 0; row < 4; row++) {
         for (int col = 0; col < 4; col++) {
             int index = row * 4 + col;
@@ -471,15 +523,25 @@ void Debugger::RenderKeyboard(Chip8& chip8)
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.6f, 0.0f, 1.0f));
             }
             
-            if (ImGui::Button(keyLabels[index], ImVec2(40, 40))) {
-                // Toggle key state (for testing)
-                chip8.keypad[key] = !chip8.keypad[key];
+            ImGui::Button(keyLabels[index], ImVec2(40, 40));
+            
+            // Handle mouse press/release for this button
+            if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                // Mouse pressed down on this button
+                chip8.keypad[key] = true;
+                mouseDownKey = key;
             }
             
             if (pressed) {
                 ImGui::PopStyleColor(3);
             }
         }
+    }
+    
+    // Release key when mouse is released anywhere
+    if (mouseDownKey >= 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        chip8.keypad[mouseDownKey] = false;
+        mouseDownKey = -1;
     }
     
     // Show currently pressed keys

@@ -27,6 +27,12 @@ private:
     std::vector<InstructionHistory> instructionHistory;
     static const size_t MAX_HISTORY = 100;
     
+    // Control state
+    bool isPaused;
+    bool stepMode;
+    bool shouldReset;
+    std::string currentRomPath;
+    
     // Layout positioning
     ImVec2 cpuStatePos, cpuStateSize;
     ImVec2 controlsPos, controlsSize;
@@ -58,4 +64,13 @@ private:
     void RenderDisplay(Chip8& chip8);
     std::string DecodeInstruction(uint16_t instruction);
     void AddToHistory(uint16_t address, uint16_t instruction);
+    
+public:
+    // Control interface for main loop
+    bool IsPaused() const { return isPaused; }
+    bool IsStepMode() const { return stepMode; }
+    bool ShouldReset() const { return shouldReset; }
+    void ResetHandled() { shouldReset = false; }
+    void StepHandled() { stepMode = false; }
+    void SetRomPath(const std::string& path) { currentRomPath = path; }
 };

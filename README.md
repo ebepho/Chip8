@@ -2,6 +2,9 @@
 
 This project is a CHIP-8 emulator with a comprehensive debugging interface built using ImGui. The debugger provides real-time visualization of the CPU state, memory, registers, and allows interactive debugging similar to professional development tools.
 
+![CHIP-8 Debugger Interface](screenshot.png)
+*Professional debugging interface with organized window layout*
+
 ## Features
 
 ### Core Emulator
@@ -13,27 +16,38 @@ This project is a CHIP-8 emulator with a comprehensive debugging interface built
 - Stack for subroutines
 
 ### Debug Interface
-- **CPU State Window**: Shows program counter, stack pointer, index register, current instruction, and decoded instruction
-- **Register Window**: Displays all 16 V registers in a convenient grid
-- **Memory Window**: Hex editor-style memory viewer with PC highlighting
-- **Controls Window**: Reset, pause/resume, step-through, and speed control
-- **Keyboard Window**: Visual representation of the CHIP-8 keypad with real-time state
+- **CPU State Window**: Shows program counter, stack pointer, index register, current instruction, and decoded instruction with instruction history
+- **Register Window**: Displays all 16 V registers in a convenient grid layout with real-time updates
+- **Memory Window**: Hex editor-style memory viewer with PC highlighting and navigation controls
+- **Stack Window**: Real-time stack visualization showing actual values and stack pointer position
+- **Controls Window**: Functional reset, pause/resume, single-step execution, and ROM loading controls
+- **Keyboard Window**: Interactive CHIP-8 keypad with press/release visual feedback and proper key mapping
+- **Display Window**: Pixel-perfect CHIP-8 display rendering with proper black and white output
+- **Organized Layout**: Professional window arrangement that fits perfectly on screen
 
 ## Building
 
 ### Prerequisites
 - CMake 3.15+
 - SDL2 development libraries
-- SDL2_image development libraries
+- SDL2_image development libraries  
 - C++17 compatible compiler
+- Git (for automatic ImGui dependency fetching)
 
 ### Build Instructions
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd Chip8
+
+# Create build directory and build
 mkdir build
 cd build
 cmake ..
 make
 ```
+
+**Note**: ImGui is automatically downloaded and built as part of the CMake configuration using FetchContent.
 
 ### Running
 ```bash
@@ -41,6 +55,12 @@ make
 ```
 
 ## Controls
+
+### Debug Controls
+- **Reset**: Completely resets the CHIP-8 system and reloads the current ROM
+- **Pause/Resume**: Toggle emulation execution (shows current state)
+- **Step**: Execute exactly one instruction when paused (for precise debugging)
+- **Load ROM**: Load a new ROM file (coming soon with file browser)
 
 ### CHIP-8 Keypad Mapping
 ```
@@ -51,23 +71,69 @@ CHIP-8 Key    Keyboard Key
 A 0 B F  ->   Z X C V
 ```
 
+### Debug Interface Navigation
+- All windows are automatically positioned for optimal layout
+- Click and drag window titles to reposition if needed
+- Memory window supports scrolling and PC following
+- Register values update in real-time during execution
+
 ## Architecture
 
 The project is organized into several components:
 
 - `src/chip8.cpp` - Core CHIP-8 CPU implementation
-- `src/instructions.cpp` - CHIP-8 instruction set implementation
-- `UI/graphics.cpp` - SDL2 graphics handling
-- `UI/debugger.cpp` - ImGui debugging interface
-- `include/` - Header files
+- `src/instructions.cpp` - CHIP-8 instruction set implementation  
+- `src/main.cpp` - Main emulation loop with debugger integration
+- `UI/graphics.cpp` - SDL2 graphics handling and ImGui rendering
+- `UI/debugger.cpp` - Complete ImGui debugging interface implementation
+- `UI/debugger.h` - Debugger class definition with control state management
+- `include/chip8.h` - CHIP-8 system header with core definitions
+- `include/const.h` - System constants and configuration
+- `roms/` - Collection of CHIP-8 ROM files for testing
+
+## Implementation Details
+
+### ImGui Integration
+- ImGui 1.91.5 with SDL2 renderer backend
+- Automatic dependency management via CMake FetchContent
+- Professional window layout system with perfect positioning
+- Real-time rendering alongside emulation
+
+### Graphics System
+- Pixel-perfect CHIP-8 display rendering
+- Proper black and white output (no color artifacts)
+- SDL2 texture handling with ABGR format
+- Smooth integration with ImGui rendering pipeline
+
+### Control System  
+- State-based execution control (running/paused/stepping/reset)
+- Integrated main loop that respects all debug states
+- Proper ROM reloading on reset
+- Thread-safe state management
 
 ## Technical Details
 
 - **Display**: 64x32 pixels, black and white
-- **Memory**: 4KB (4096 bytes)
+- **Memory**: 4KB (4096 bytes) 
 - **Registers**: 16 general-purpose 8-bit registers (V0-VF)
-- **Stack**: 16 levels of 16-bit values
+- **Stack**: 16 levels of 16-bit values with visual stack viewer
 - **Timers**: 60Hz delay and sound timers
 - **Instruction Set**: Complete CHIP-8 instruction set implementation
+- **Debug Features**: Real-time instruction disassembly, memory visualization, register monitoring
+- **UI Framework**: ImGui with SDL2 backend for cross-platform compatibility
 
-The debugger uses ImGui for the interface, providing a modern, responsive debugging experience that runs alongside the emulator in real-time.
+The debugger uses ImGui for the interface, providing a modern, responsive debugging experience that runs alongside the emulator in real-time. The interface is designed to mimic professional debugging tools with organized windows and comprehensive system state visualization.
+
+## ROM Compatibility
+
+The emulator has been tested with various CHIP-8 ROMs including:
+- PONG - Classic paddle game
+- INVADERS - Space Invaders clone  
+- TETRIS - Tetris implementation
+- BRIX - Breakout clone
+- IBM LOGO - IBM logo display
+- And many more in the `roms/` directory
+
+## Contributing
+
+Feel free to contribute improvements, bug fixes, or additional features. The codebase is well-organized and documented for easy understanding and modification.
