@@ -4,12 +4,21 @@
 #include "imgui_impl_sdlrenderer2.h"
 #include <iomanip>
 #include <sstream>
+#include <iostream>
+#include <cstdio>
 
-Debugger::Debugger() : showRegisters(true), showMemory(true), showControls(true), showCPUState(true), showKeyboard(true), showDisassembly(true), renderer(nullptr) {}
+Debugger::Debugger() : showRegisters(true), showMemory(true), showControls(true), showCPUState(true), showKeyboard(true), showDisassembly(true), showDisplay(true), renderer(nullptr), displayTexture(nullptr) {}
 
 bool Debugger::Init(SDL_Window* window, SDL_Renderer* sdlRenderer)
 {
     renderer = sdlRenderer; // Store the renderer for later use
+    
+    // Create texture for CHIP-8 display
+    displayTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 64, 32);
+    if (!displayTexture) {
+        std::cout << "Failed to create display texture: " << SDL_GetError() << std::endl;
+        return false;
+    }
     
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -105,6 +114,13 @@ void Debugger::RenderOrganizedLayout(Chip8& chip8)
         ImGui::SetNextWindowSize(ImVec2(300, 350), ImGuiCond_FirstUseEver);
         RenderDisassembly(chip8);
     }
+    
+    // Display Window (center)
+    if (showDisplay) {
+        ImGui::SetNextWindowPos(displayPos, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(displaySize, ImGuiCond_FirstUseEver);
+        RenderDisplay(chip8);
+    }
 }
 
 void Debugger::ProcessEvent(SDL_Event* event)
@@ -138,6 +154,7 @@ void Debugger::Render(Chip8& chip8)
             ImGui::MenuItem("Registers", NULL, &showRegisters);
             ImGui::MenuItem("Memory", NULL, &showMemory);
             ImGui::MenuItem("Disassembly", NULL, &showDisassembly);
+            ImGui::MenuItem("Display", NULL, &showDisplay);
             ImGui::MenuItem("Controls", NULL, &showControls);
             ImGui::MenuItem("Keyboard", NULL, &showKeyboard);
             ImGui::Separator();
@@ -453,34 +470,104 @@ void Debugger::RenderKeyboard(Chip8& chip8)
 
 void Debugger::RenderDisassembly(Chip8& chip8)
 {
-    ImGui::Begin("CHIP-8 - Disassembly", &showDisassembly);
+    ImGui::Begin("CHIP-8 - CPU Disassembler", &showDisassembly);
     
-    ImGui::SeparatorText("Code Disassembly");
+    static bool followPC = true;
+    ImGui::Checkbox("Follow PC", &followPC);
     
-    // Show instructions around current PC
-    int startAddr = std::max(0x200, (int)chip8.pc - 20);
-    int endAddr = std::min(4096, (int)chip8.pc + 20);
+    ImGui::SeparatorText("Assembly Code");
     
     ImGui::BeginChild("DisassemblyView", ImVec2(0, -1), true);
     
+    // Show more instructions around current PC for context
+    int startAddr = followPC ? std::max(0x200, (int)chip8.pc - 40) : 0x200;
+    int endAddr = std::min(4095, startAddr + 80); // Show ~40 instructions
+    
+    // Use monospace font for better alignment
+    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+    
     for (int addr = startAddr; addr < endAddr; addr += 2) {
-        if (addr >= 4096 - 1) break;
+        if (addr >= 4095) break;
         
         uint16_t instruction = (chip8.memory[addr] << 8) | chip8.memory[addr + 1];
         std::string decoded = DecodeInstruction(instruction);
         
-        // Highlight current instruction
+        // Highlight current instruction with arrow and different background
         bool isCurrent = (addr == chip8.pc);
         if (isCurrent) {
+            // Highlight the entire line
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
-            ImGui::Text("=> 0x%04X: %04X  %s", addr, instruction, decoded.c_str());
+            ImGui::Text("-> 0x%03X | %02X %02X | %-12s  %s", 
+                       addr, 
+                       chip8.memory[addr], 
+                       chip8.memory[addr + 1],
+                       (std::to_string((instruction & 0xF000) >> 12) + std::to_string((instruction & 0x0F00) >> 8) + 
+                        std::to_string((instruction & 0x00F0) >> 4) + std::to_string(instruction & 0x000F)).c_str(),
+                       decoded.c_str());
             ImGui::PopStyleColor();
+            
+            // Auto-scroll to current instruction when following PC
+            if (followPC) {
+                ImGui::SetScrollHereY(0.5f);
+            }
         } else {
-            ImGui::Text("   0x%04X: %04X  %s", addr, instruction, decoded.c_str());
+            // Regular instruction display
+            ImGui::Text("   0x%03X | %02X %02X | %04X        %s", 
+                       addr, 
+                       chip8.memory[addr], 
+                       chip8.memory[addr + 1],
+                       instruction,
+                       decoded.c_str());
         }
     }
     
+    ImGui::PopFont();
     ImGui::EndChild();
+    ImGui::End();
+}
+
+void Debugger::RenderDisplay(Chip8& chip8)
+{
+    ImGui::Begin("CHIP-8 - Display", &showDisplay, ImGuiWindowFlags_NoResize);
+    
+    // Convert CHIP-8 display to RGBA texture
+    uint32_t pixels[64 * 32];
+    for (int i = 0; i < 64 * 32; i++) {
+        // CHIP-8 uses 1-bit per pixel, convert to RGBA
+        pixels[i] = chip8.display[i] ? 0xFFFFFFFF : 0xFF000000; // White or Black
+    }
+    
+    // Update the texture
+    SDL_UpdateTexture(displayTexture, nullptr, pixels, 64 * sizeof(uint32_t));
+    
+    // Get texture as ImGui texture ID
+    ImTextureID textureID = (ImTextureID)(intptr_t)displayTexture;
+    
+    // Calculate display size (maintain aspect ratio)
+    ImVec2 windowSize = ImGui::GetContentRegionAvail();
+    float aspectRatio = 64.0f / 32.0f; // CHIP-8 aspect ratio
+    
+    ImVec2 displaySize;
+    if (windowSize.x / aspectRatio <= windowSize.y) {
+        displaySize.x = windowSize.x;
+        displaySize.y = windowSize.x / aspectRatio;
+    } else {
+        displaySize.y = windowSize.y;
+        displaySize.x = windowSize.y * aspectRatio;
+    }
+    
+    // Center the display
+    ImVec2 cursorPos = ImGui::GetCursorPos();
+    ImVec2 centerPos = ImVec2(
+        cursorPos.x + (windowSize.x - displaySize.x) * 0.5f,
+        cursorPos.y + (windowSize.y - displaySize.y) * 0.5f
+    );
+    
+    ImGui::SetCursorPos(centerPos);
+    
+    // Render the display with nearest neighbor filtering for pixel-perfect scaling
+    ImGui::Image(textureID, displaySize);
+    
     ImGui::End();
 }
 
@@ -493,41 +580,125 @@ std::string Debugger::DecodeInstruction(uint16_t instruction)
     uint8_t nn = instruction & 0x00FF;
     uint16_t nnn = instruction & 0x0FFF;
     
+    char buffer[64];
+    
     switch (firstNibble) {
         case 0x0:
             if (instruction == 0x00E0) return "CLS";
             if (instruction == 0x00EE) return "RET";
-            return "SYS " + std::to_string(nnn);
+            snprintf(buffer, sizeof(buffer), "SYS 0x%03X", nnn);
+            return buffer;
             
         case 0x1:
-            return "JP " + std::to_string(nnn);
+            snprintf(buffer, sizeof(buffer), "JP 0x%03X", nnn);
+            return buffer;
             
         case 0x2:
-            return "CALL " + std::to_string(nnn);
+            snprintf(buffer, sizeof(buffer), "CALL 0x%03X", nnn);
+            return buffer;
             
         case 0x3:
-            return "SE V" + std::to_string(x) + ", " + std::to_string(nn);
+            snprintf(buffer, sizeof(buffer), "SE V%X, 0x%02X (%d)", x, nn, nn);
+            return buffer;
             
         case 0x4:
-            return "SNE V" + std::to_string(x) + ", " + std::to_string(nn);
+            snprintf(buffer, sizeof(buffer), "SNE V%X, 0x%02X (%d)", x, nn, nn);
+            return buffer;
             
         case 0x5:
-            return "SE V" + std::to_string(x) + ", V" + std::to_string(y);
+            if (n == 0) {
+                snprintf(buffer, sizeof(buffer), "SE V%X, V%X", x, y);
+                return buffer;
+            }
+            break;
             
         case 0x6:
-            return "LD V" + std::to_string(x) + ", " + std::to_string(nn);
+            snprintf(buffer, sizeof(buffer), "LD V%X, 0x%02X (%d)", x, nn, nn);
+            return buffer;
             
         case 0x7:
-            return "ADD V" + std::to_string(x) + ", " + std::to_string(nn);
+            snprintf(buffer, sizeof(buffer), "ADD V%X, 0x%02X (%d)", x, nn, nn);
+            return buffer;
+            
+        case 0x8:
+            switch (n) {
+                case 0x0: snprintf(buffer, sizeof(buffer), "LD V%X, V%X", x, y); return buffer;
+                case 0x1: snprintf(buffer, sizeof(buffer), "OR V%X, V%X", x, y); return buffer;
+                case 0x2: snprintf(buffer, sizeof(buffer), "AND V%X, V%X", x, y); return buffer;
+                case 0x3: snprintf(buffer, sizeof(buffer), "XOR V%X, V%X", x, y); return buffer;
+                case 0x4: snprintf(buffer, sizeof(buffer), "ADD V%X, V%X", x, y); return buffer;
+                case 0x5: snprintf(buffer, sizeof(buffer), "SUB V%X, V%X", x, y); return buffer;
+                case 0x6: snprintf(buffer, sizeof(buffer), "SHR V%X", x); return buffer;
+                case 0x7: snprintf(buffer, sizeof(buffer), "SUBN V%X, V%X", x, y); return buffer;
+                case 0xE: snprintf(buffer, sizeof(buffer), "SHL V%X", x); return buffer;
+            }
+            break;
+            
+        case 0x9:
+            if (n == 0) {
+                snprintf(buffer, sizeof(buffer), "SNE V%X, V%X", x, y);
+                return buffer;
+            }
+            break;
             
         case 0xA:
-            return "LD I, " + std::to_string(nnn);
+            snprintf(buffer, sizeof(buffer), "LD I, 0x%03X", nnn);
+            return buffer;
+            
+        case 0xB:
+            snprintf(buffer, sizeof(buffer), "JP V0, 0x%03X", nnn);
+            return buffer;
+            
+        case 0xC:
+            snprintf(buffer, sizeof(buffer), "RND V%X, 0x%02X", x, nn);
+            return buffer;
             
         case 0xD:
-            return "DRW V" + std::to_string(x) + ", V" + std::to_string(y) + ", " + std::to_string(n);
+            snprintf(buffer, sizeof(buffer), "DRW V%X, V%X, 0x%X (%d)", x, y, n, n);
+            return buffer;
             
-        default:
-            return "UNK";
+        case 0xE:
+            if (nn == 0x9E) {
+                snprintf(buffer, sizeof(buffer), "SKP V%X", x);
+                return buffer;
+            }
+            if (nn == 0xA1) {
+                snprintf(buffer, sizeof(buffer), "SKNP V%X", x);
+                return buffer;
+            }
+            break;
+            
+        case 0xF:
+            switch (nn) {
+                case 0x07: snprintf(buffer, sizeof(buffer), "LD V%X, DT", x); return buffer;
+                case 0x0A: snprintf(buffer, sizeof(buffer), "LD V%X, K", x); return buffer;
+                case 0x15: snprintf(buffer, sizeof(buffer), "LD DT, V%X", x); return buffer;
+                case 0x18: snprintf(buffer, sizeof(buffer), "LD ST, V%X", x); return buffer;
+                case 0x1E: snprintf(buffer, sizeof(buffer), "ADD I, V%X", x); return buffer;
+                case 0x29: snprintf(buffer, sizeof(buffer), "LD F, V%X", x); return buffer;
+                case 0x33: snprintf(buffer, sizeof(buffer), "LD B, V%X", x); return buffer;
+                case 0x55: snprintf(buffer, sizeof(buffer), "LD [I], V%X", x); return buffer;
+                case 0x65: snprintf(buffer, sizeof(buffer), "LD V%X, [I]", x); return buffer;
+            }
+            break;
+    }
+    
+    snprintf(buffer, sizeof(buffer), "UNK 0x%04X", instruction);
+    return buffer;
+}
+
+void Debugger::AddToHistory(uint16_t address, uint16_t instruction)
+{
+    InstructionHistory entry;
+    entry.address = address;
+    entry.instruction = instruction;
+    entry.decoded = DecodeInstruction(instruction);
+    
+    instructionHistory.push_back(entry);
+    
+    // Keep only the last MAX_HISTORY entries
+    if (instructionHistory.size() > MAX_HISTORY) {
+        instructionHistory.erase(instructionHistory.begin());
     }
 }
 
@@ -540,7 +711,13 @@ void Debugger::EndFrame()
 
 void Debugger::Shutdown()
 {
-    // Cleanup
+    // Clean up display texture
+    if (displayTexture) {
+        SDL_DestroyTexture(displayTexture);
+        displayTexture = nullptr;
+    }
+    
+    // Cleanup ImGui
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();

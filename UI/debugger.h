@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL2/SDL.h>
 #include <string>
+#include <vector>
 #include "chip8.h"
 #include "imgui.h"
 
@@ -13,7 +14,18 @@ private:
     bool showCPUState;
     bool showKeyboard;
     bool showDisassembly;
+    bool showDisplay;
     SDL_Renderer* renderer;
+    SDL_Texture* displayTexture;
+    
+    // Instruction history for debugging
+    struct InstructionHistory {
+        uint16_t address;
+        uint16_t instruction;
+        std::string decoded;
+    };
+    std::vector<InstructionHistory> instructionHistory;
+    static const size_t MAX_HISTORY = 100;
     
     // Layout positioning
     ImVec2 controlsPos, controlsSize;
@@ -41,5 +53,7 @@ private:
     void RenderControls(Chip8& chip8);
     void RenderKeyboard(Chip8& chip8);
     void RenderDisassembly(Chip8& chip8);
+    void RenderDisplay(Chip8& chip8);
     std::string DecodeInstruction(uint16_t instruction);
+    void AddToHistory(uint16_t address, uint16_t instruction);
 };

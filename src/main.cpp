@@ -120,10 +120,7 @@ int main(int argc, char* argv[])
 		// Render everything
 		graphics.Clear();
 		
-		// Update graphics (render CHIP-8 display)
-		graphics.Update(chip8.display, DISPLAY_WIDTH, DISPLAY_HEIGHT, videoPitch);
-		
-		// Render ImGui debugger interface
+		// Render ImGui debugger interface (includes display now)
 		debugger.NewFrame();
 		debugger.Render(chip8);
 		debugger.EndFrame();
