@@ -70,13 +70,19 @@ void Graphics::Update(void const* buffer, int width, int height, int pitch)
     // Update the texture with the new pixel data
     SDL_UpdateTexture(texture, nullptr, buffer, pitch);
 
-    // Clear the renderer and copy the texture to it, then present
+    // Copy the entire texture to a portion of the window (leave space for ImGui)
+    SDL_Rect displayRect = { 10, 10, 640, 320 }; // Fixed size display area
+    SDL_RenderCopy(renderer, texture, nullptr, &displayRect);
+}
+
+void Graphics::Clear()
+{
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
+}
 
-    // Copy the entire texture to the entire window
-    SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-
-    // Present the updated renderer
+void Graphics::Present()
+{
     SDL_RenderPresent(renderer);
 }
 
