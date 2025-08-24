@@ -16,6 +16,7 @@ This project is a CHIP-8 emulator with a comprehensive debugging interface built
 - Stack for subroutines
 
 ### Debug Interface
+- **ROM Selector**: Interactive file browser for loading ROMs from the `roms/` directory
 - **CPU State Window**: Shows program counter, stack pointer, index register, current instruction, and decoded instruction with instruction history
 - **Register Window**: Displays all 16 V registers in a convenient grid layout with real-time updates
 - **Memory Window**: Hex editor-style memory viewer with PC highlighting and navigation controls
@@ -51,8 +52,20 @@ make
 
 ### Running
 ```bash
+# Start with ROM selector (recommended)
+./chip8
+
+# Or load a specific ROM directly
 ./chip8 <ROM_file>
+
+# With custom settings
+./chip8 [ROM_file] [scale] [cycleDelay]
 ```
+
+**Parameters:**
+- `ROM_file`: Path to CHIP-8 ROM (optional - ROM selector will appear if not provided)
+- `scale`: Display scale factor (default: 10)
+- `cycleDelay`: Milliseconds per CPU cycle for emulation speed (default: 1.4)
 
 ## Controls
 
@@ -60,7 +73,13 @@ make
 - **Reset**: Completely resets the CHIP-8 system and reloads the current ROM
 - **Pause/Resume**: Toggle emulation execution (shows current state)
 - **Step**: Execute exactly one instruction when paused (for precise debugging)
-- **Load ROM**: Load a new ROM file (coming soon with file browser)
+- **Load ROM**: Opens ROM selector to browse and load ROMs from the `roms/` directory
+
+### ROM Selection
+- **Startup**: ROM selector appears automatically when starting without specifying a ROM
+- **File Menu**: Access "Load ROM..." from the File menu at any time
+- **Browse ROMs**: Visual list of all available ROMs in the `roms/` directory
+- **Quick Loading**: Double-click or select and click "Load ROM" to start playing
 
 ### CHIP-8 Keypad Mapping
 ```

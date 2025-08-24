@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <string>
 #include <vector>
+#include <filesystem>
 #include "chip8.h"
 #include "imgui.h"
 
@@ -33,6 +34,13 @@ private:
     bool shouldReset;
     std::string currentRomPath;
     
+    // ROM selection
+    bool romLoadRequested;
+    std::string selectedRomPath;
+    std::vector<std::string> availableRoms;
+    std::string romsDirectory;
+    int selectedRomIndex;
+    
     // Layout positioning
     ImVec2 cpuStatePos, cpuStateSize;
     ImVec2 controlsPos, controlsSize;
@@ -62,6 +70,7 @@ private:
     void RenderKeyboard(Chip8& chip8);
     void RenderDisassembly(Chip8& chip8);
     void RenderDisplay(Chip8& chip8);
+    void ScanForRoms();
     std::string DecodeInstruction(uint16_t instruction);
     void AddToHistory(uint16_t address, uint16_t instruction);
     
@@ -70,7 +79,11 @@ public:
     bool IsPaused() const { return isPaused; }
     bool IsStepMode() const { return stepMode; }
     bool ShouldReset() const { return shouldReset; }
+    bool IsRomLoadRequested() const { return romLoadRequested; }
     void ResetHandled() { shouldReset = false; }
     void StepHandled() { stepMode = false; }
+    void RomLoadHandled() { romLoadRequested = false; }
     void SetRomPath(const std::string& path) { currentRomPath = path; }
+    void SetRomsDirectory(const std::string& dir) { romsDirectory = dir; ScanForRoms(); }
+    std::string GetSelectedRomPath() const { return selectedRomPath; }
 };

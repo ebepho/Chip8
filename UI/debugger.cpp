@@ -7,7 +7,7 @@
 #include <iostream>
 #include <cstdio>
 
-Debugger::Debugger() : showRegisters(true), showMemory(true), showControls(true), showCPUState(true), showKeyboard(true), showDisassembly(true), showDisplay(true), renderer(nullptr), displayTexture(nullptr), isPaused(false), stepMode(false), shouldReset(false) {}
+Debugger::Debugger() : showRegisters(true), showMemory(true), showControls(true), showCPUState(true), showKeyboard(true), showDisassembly(true), showDisplay(true), renderer(nullptr), displayTexture(nullptr), isPaused(false), stepMode(false), shouldReset(false), romLoadRequested(false), selectedRomIndex(-1) {}
 
 bool Debugger::Init(SDL_Window* window, SDL_Renderer* sdlRenderer)
 {
@@ -454,26 +454,54 @@ void Debugger::RenderControls(Chip8& chip8)
         ImGui::TextDisabled("No ROM loaded");
     }
     
-    if (ImGui::Button("Load ROM", ImVec2(-1, 0))) {
-        // TODO: Implement ROM file browser
-        ImGui::OpenPopup("Load ROM##popup");
-    }
+    ImGui::SeparatorText("ROM Selection");
     
-    // Simple ROM selection popup (for now just show available ROMs)
-    if (ImGui::BeginPopup("Load ROM##popup")) {
+    // ROM list
+    if (availableRoms.empty()) {
+        ImGui::TextDisabled("No ROMs found");
+        if (ImGui::Button("Scan ROMs", ImVec2(-1, 0))) {
+            ScanForRoms();
+        }
+    } else {
         ImGui::Text("Available ROMs:");
-        ImGui::Separator();
         
-        // List some common ROMs (this could be improved with file system scanning)
-        const char* roms[] = {"IBMLOGO", "PONG", "TETRIS", "INVADERS", "BRIX", "MAZE"};
-        for (int i = 0; i < 6; i++) {
-            if (ImGui::Selectable(roms[i])) {
-                currentRomPath = std::string("../roms/") + roms[i];
-                shouldReset = true; // Trigger reset to load new ROM
-                ImGui::CloseCurrentPopup();
+        // Create a combo box with all available ROMs
+        std::string previewValue = (selectedRomIndex >= 0 && selectedRomIndex < availableRoms.size()) 
+                                  ? availableRoms[selectedRomIndex] 
+                                  : "Select a ROM...";
+                                  
+        if (ImGui::BeginCombo("##romselect", previewValue.c_str())) {
+            for (int i = 0; i < availableRoms.size(); i++) {
+                bool isSelected = (selectedRomIndex == i);
+                
+                if (ImGui::Selectable(availableRoms[i].c_str(), isSelected)) {
+                    selectedRomIndex = i;
+                }
+                
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        
+        // Load ROM button
+        bool canLoad = selectedRomIndex >= 0 && selectedRomIndex < availableRoms.size();
+        
+        if (!canLoad) {
+            ImGui::BeginDisabled();
+        }
+        
+        if (ImGui::Button("Load Selected ROM", ImVec2(-1, 0))) {
+            if (selectedRomIndex >= 0 && selectedRomIndex < availableRoms.size()) {
+                selectedRomPath = romsDirectory + "/" + availableRoms[selectedRomIndex];
+                romLoadRequested = true;
             }
         }
-        ImGui::EndPopup();
+        
+        if (!canLoad) {
+            ImGui::EndDisabled();
+        }
     }
     
     ImGui::End();
@@ -786,6 +814,29 @@ void Debugger::AddToHistory(uint16_t address, uint16_t instruction)
     // Keep only the last MAX_HISTORY entries
     if (instructionHistory.size() > MAX_HISTORY) {
         instructionHistory.erase(instructionHistory.begin());
+    }
+}
+
+void Debugger::ScanForRoms()
+{
+    availableRoms.clear();
+    
+    if (romsDirectory.empty()) {
+        return;
+    }
+    
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator(romsDirectory)) {
+            if (entry.is_regular_file()) {
+                std::string filename = entry.path().filename().string();
+                // Skip hidden files and system files
+                if (filename[0] != '.' && filename != "DS_Store") {
+                    availableRoms.push_back(filename);
+                }
+            }
+        }
+    } catch (const std::filesystem::filesystem_error& ex) {
+        std::cout << "Error scanning ROMs directory: " << ex.what() << std::endl;
     }
 }
 

@@ -9,22 +9,31 @@
 
 int main(int argc, char* argv[])
 {
-	if(argc < 2 || argc > 4)
-	{
-		std::cout << "Usage: " << argv[0] << " <ROM file> [scale] [cycleDelay]" << std::endl;
-		std::cout << "  scale: Display scale factor (default: 10)" << std::endl;
-		std::cout << "  cycleDelay: Milliseconds per CPU cycle (default: 1.4)" << std::endl;
-		return 1;
-	}
-
 	Chip8 chip8;
 	Graphics graphics;
 	Debugger debugger;
 	
-	// Parse command line arguments
-	int scale = (argc >= 3) ? std::stoi(argv[2]) : 10;
-
-	float cycleDelay = (argc >= 4) ? std::stof(argv[3]) : 1.4f; // milliseconds per cycle (700 instructions/second)
+	// Parse command line arguments (ROM is now optional)
+	int scale = 10;
+	float cycleDelay = 1.4f; // milliseconds per cycle (700 instructions/second)
+	std::string romPath;
+	bool romLoaded = false;
+	
+	if (argc >= 2) {
+		// ROM file specified
+		romPath = argv[1];
+		romLoaded = true;
+		scale = (argc >= 3) ? std::stoi(argv[2]) : 10;
+		cycleDelay = (argc >= 4) ? std::stof(argv[3]) : 1.4f;
+	} else {
+		// No ROM specified - will show ROM selector
+		std::cout << "CHIP-8 Emulator with Debugger" << std::endl;
+		std::cout << "Usage: " << argv[0] << " [ROM file] [scale] [cycleDelay]" << std::endl;
+		std::cout << "  ROM file: CHIP-8 ROM to load (optional - will show ROM selector if not provided)" << std::endl;
+		std::cout << "  scale: Display scale factor (default: 10)" << std::endl;
+		std::cout << "  cycleDelay: Milliseconds per CPU cycle (default: 1.4)" << std::endl;
+		std::cout << "Starting without ROM - use the ROM selector to load a game..." << std::endl;
+	}
 
 	// Create a larger window to accommodate the organized debugger UI
 	if (!graphics.Init("Chip8 Emulator with Debugger", 1200, 800, DISPLAY_WIDTH, DISPLAY_HEIGHT)) {
@@ -38,8 +47,16 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	chip8.LoadROM(argv[1]);
-	debugger.SetRomPath(argv[1]); // Set the initial ROM path in debugger
+	// Set up ROM directory for the selector (assuming executable is in build/ directory)
+	debugger.SetRomsDirectory("../roms");
+
+	// Load ROM if one was specified
+	if (romLoaded) {
+		chip8.LoadROM(romPath.c_str());
+		debugger.SetRomPath(romPath);
+	}
+	// ROM selector is now integrated into the Controls window and will be visible automatically
+
 	int videoPitch = sizeof(chip8.display[0]) * DISPLAY_WIDTH; // Assuming 32-bit pixels
 
 	auto lastCycleTime = std::chrono::high_resolution_clock::now();
@@ -91,19 +108,34 @@ int main(int argc, char* argv[])
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		
+		// Check for ROM load request
+		if (debugger.IsRomLoadRequested()) {
+			std::string newRomPath = debugger.GetSelectedRomPath();
+			if (!newRomPath.empty()) {
+				chip8 = Chip8(); // Reset the system
+				chip8.LoadROM(newRomPath.c_str());
+				debugger.SetRomPath(newRomPath);
+				romPath = newRomPath;
+				romLoaded = true;
+				std::cout << "Loaded ROM: " << newRomPath << std::endl;
+			}
+			debugger.RomLoadHandled();
+		}
+		
 		// Check for reset request
 		if (debugger.ShouldReset()) {
 			// Reset the CHIP-8 system
 			chip8 = Chip8();
-			// Reload the current ROM
-			const char* romPath = debugger.IsPaused() ? argv[1] : argv[1]; // Use debugger's ROM path if available
-			chip8.LoadROM(romPath);
+			// Reload the current ROM if one is loaded
+			if (romLoaded && !romPath.empty()) {
+				chip8.LoadROM(romPath.c_str());
+			}
 			debugger.ResetHandled();
 			continue; // Skip this frame to let reset complete
 		}
 		
-		// Handle CPU cycles (only if not paused)
-		if (!debugger.IsPaused()) {
+		// Handle CPU cycles (only if not paused and ROM is loaded)
+		if (!debugger.IsPaused() && romLoaded) {
 			float cpuDt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
 			if (cpuDt > cycleDelay) {
 				lastCycleTime = currentTime;
