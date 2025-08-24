@@ -28,11 +28,13 @@ private:
     static const size_t MAX_HISTORY = 100;
     
     // Layout positioning
+    ImVec2 cpuStatePos, cpuStateSize;
     ImVec2 controlsPos, controlsSize;
     ImVec2 displayPos, displaySize;
     ImVec2 registersPos, registersSize;
     ImVec2 keyboardPos, keyboardSize;
     ImVec2 memoryPos, memorySize;
+    ImVec2 disassemblyPos, disassemblySize;
     
 public:
     Debugger();

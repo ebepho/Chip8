@@ -26,8 +26,8 @@ int main(int argc, char* argv[])
 
 	float cycleDelay = (argc >= 4) ? std::stof(argv[3]) : 1.4f; // milliseconds per cycle (700 instructions/second)
 
-	// Create a larger window to accommodate the debugger UI
-	if (!graphics.Init("Chip8 Emulator with Debugger", 1400, 800, DISPLAY_WIDTH, DISPLAY_HEIGHT)) {
+	// Create a larger window to accommodate the organized debugger UI
+	if (!graphics.Init("Chip8 Emulator with Debugger", 1200, 800, DISPLAY_WIDTH, DISPLAY_HEIGHT)) {
 		std::cout << "Failed to initialize graphics." << std::endl;
 		return -1;
 	}

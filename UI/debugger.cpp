@@ -13,8 +13,8 @@ bool Debugger::Init(SDL_Window* window, SDL_Renderer* sdlRenderer)
 {
     renderer = sdlRenderer; // Store the renderer for later use
     
-    // Create texture for CHIP-8 display
-    displayTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 64, 32);
+    // Create texture for CHIP-8 display with proper format
+    displayTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, 64, 32);
     if (!displayTexture) {
         std::cout << "Failed to create display texture: " << SDL_GetError() << std::endl;
         return false;
@@ -42,84 +42,115 @@ void Debugger::SetupWindowLayout()
     float windowHeight = io.DisplaySize.y;
     float menuBarHeight = ImGui::GetFrameHeight();
     
-    // Define layout constants
-    const float leftColumnWidth = 300.0f;
-    const float rightColumnWidth = 350.0f;
-    const float centerColumnWidth = windowWidth - leftColumnWidth - rightColumnWidth - 30.0f; // 30px for padding
+    // Calculate available space (subtract menu bar and padding)
+    float availableHeight = windowHeight - menuBarHeight - 20.0f;
+    float availableWidth = windowWidth - 20.0f;
     
-    // Set window positions and sizes
-    // Left column - CPU State and Controls
-    ImGui::SetNextWindowPos(ImVec2(10, menuBarHeight + 10));
-    ImGui::SetNextWindowSize(ImVec2(leftColumnWidth, (windowHeight - menuBarHeight) * 0.6f - 15));
+    // Define precise layout - organized in a grid
+    // Left column: 280px - CPU State (top) + Controls (bottom)
+    // Center column: 540px - Display (top) + Memory (bottom) 
+    // Right column: 320px - Registers + Keyboard + Disassembly
     
-    // Controls below CPU State
-    controlsPos = ImVec2(10, menuBarHeight + (windowHeight - menuBarHeight) * 0.6f + 5);
-    controlsSize = ImVec2(leftColumnWidth, (windowHeight - menuBarHeight) * 0.4f - 15);
+    const float leftWidth = 280.0f;
+    const float centerWidth = 540.0f;
+    const float rightWidth = 320.0f;
+    const float padding = 10.0f;
     
-    // Center column - Display area (reserved for CHIP-8 screen)
-    displayPos = ImVec2(leftColumnWidth + 20, menuBarHeight + 10);
-    displaySize = ImVec2(centerColumnWidth, 350);
+    // Left Column Layout
+    const float leftX = padding;
+    const float cpuStateHeight = 220.0f;
+    const float controlsHeight = availableHeight - cpuStateHeight - padding;
     
-    // Right column - Registers and Keyboard
-    registersPos = ImVec2(leftColumnWidth + centerColumnWidth + 30, menuBarHeight + 10);
-    registersSize = ImVec2(rightColumnWidth, 200);
+    // Center Column Layout  
+    const float centerX = leftX + leftWidth + padding;
+    const float displayHeight = 300.0f;
+    const float memoryHeight = availableHeight - displayHeight - padding;
     
-    keyboardPos = ImVec2(leftColumnWidth + centerColumnWidth + 30, menuBarHeight + 220);
-    keyboardSize = ImVec2(rightColumnWidth, 200);
+    // Right Column Layout
+    const float rightX = centerX + centerWidth + padding;
+    const float registersHeight = 180.0f;
+    const float keyboardHeight = 180.0f;
+    const float disassemblyHeight = availableHeight - registersHeight - keyboardHeight - (2 * padding);
     
-    // Memory window - bottom spanning most of the width
-    memoryPos = ImVec2(10, windowHeight - 300);
-    memorySize = ImVec2(windowWidth - 20, 280);
+    // Store positions for use in RenderOrganizedLayout
+    // CPU State (top-left)
+    cpuStatePos = ImVec2(leftX, menuBarHeight + padding);
+    cpuStateSize = ImVec2(leftWidth, cpuStateHeight);
+    
+    // Controls (bottom-left)
+    controlsPos = ImVec2(leftX, menuBarHeight + padding + cpuStateHeight + padding);
+    controlsSize = ImVec2(leftWidth, controlsHeight);
+    
+    // Display (top-center)
+    displayPos = ImVec2(centerX, menuBarHeight + padding);
+    displaySize = ImVec2(centerWidth, displayHeight);
+    
+    // Memory (bottom-center)
+    memoryPos = ImVec2(centerX, menuBarHeight + padding + displayHeight + padding);
+    memorySize = ImVec2(centerWidth, memoryHeight);
+    
+    // Registers (top-right)
+    registersPos = ImVec2(rightX, menuBarHeight + padding);
+    registersSize = ImVec2(rightWidth, registersHeight);
+    
+    // Keyboard (middle-right)
+    keyboardPos = ImVec2(rightX, menuBarHeight + padding + registersHeight + padding);
+    keyboardSize = ImVec2(rightWidth, keyboardHeight);
+    
+    // Disassembly (bottom-right)
+    disassemblyPos = ImVec2(rightX, menuBarHeight + padding + registersHeight + padding + keyboardHeight + padding);
+    disassemblySize = ImVec2(rightWidth, disassemblyHeight);
 }
 
 void Debugger::RenderOrganizedLayout(Chip8& chip8)
 {
-    // CPU State Window (top-left)
+    // CPU State Window (top-left) - Always set position and size
     if (showCPUState) {
-        ImGui::SetNextWindowPos(ImVec2(10, ImGui::GetFrameHeight() + 10), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(cpuStatePos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(cpuStateSize, ImGuiCond_Always);
         RenderCPUState(chip8);
     }
     
     // Controls Window (bottom-left)
     if (showControls) {
-        ImGui::SetNextWindowPos(controlsPos, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(controlsSize, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(controlsPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(controlsSize, ImGuiCond_Always);
         RenderControls(chip8);
+    }
+    
+    // Display Window (top-center)
+    if (showDisplay) {
+        ImGui::SetNextWindowPos(displayPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(displaySize, ImGuiCond_Always);
+        RenderDisplay(chip8);
+    }
+    
+    // Memory Window (bottom-center)
+    if (showMemory) {
+        ImGui::SetNextWindowPos(memoryPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(memorySize, ImGuiCond_Always);
+        RenderMemory(chip8);
     }
     
     // Registers Window (top-right)
     if (showRegisters) {
-        ImGui::SetNextWindowPos(registersPos, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(registersSize, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(registersPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(registersSize, ImGuiCond_Always);
         RenderRegisters(chip8);
     }
     
     // Keyboard Window (middle-right)
     if (showKeyboard) {
-        ImGui::SetNextWindowPos(keyboardPos, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(keyboardSize, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(keyboardPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(keyboardSize, ImGuiCond_Always);
         RenderKeyboard(chip8);
     }
     
-    // Memory Window (bottom spanning)
-    if (showMemory) {
-        ImGui::SetNextWindowPos(memoryPos, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(memorySize, ImGuiCond_FirstUseEver);
-        RenderMemory(chip8);
-    }
-    
-    // Disassembly Window (center-right)
+    // Disassembly Window (bottom-right)
     if (showDisassembly) {
-        ImGui::SetNextWindowPos(ImVec2(displayPos.x + displaySize.x + 10, displayPos.y), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(300, 350), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(disassemblyPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(disassemblySize, ImGuiCond_Always);
         RenderDisassembly(chip8);
-    }
-    
-    // Display Window (center)
-    if (showDisplay) {
-        ImGui::SetNextWindowPos(displayPos, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(displaySize, ImGuiCond_FirstUseEver);
-        RenderDisplay(chip8);
     }
 }
 
@@ -180,7 +211,7 @@ void Debugger::Render(Chip8& chip8)
 
 void Debugger::RenderCPUState(Chip8& chip8)
 {
-    ImGui::Begin("CHIP-8 - CPU State", &showCPUState, ImGuiWindowFlags_NoResize);
+    ImGui::Begin("CHIP-8 - CPU State", &showCPUState, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
     
     // Get current instruction
     uint16_t instruction = (chip8.memory[chip8.pc] << 8) | chip8.memory[chip8.pc + 1];
@@ -229,7 +260,7 @@ void Debugger::RenderCPUState(Chip8& chip8)
 
 void Debugger::RenderRegisters(Chip8& chip8)
 {
-    ImGui::Begin("CHIP-8 - Registers", &showRegisters, ImGuiWindowFlags_NoResize);
+    ImGui::Begin("CHIP-8 - Registers", &showRegisters, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
     
     ImGui::SeparatorText("General Purpose Registers");
     
@@ -263,7 +294,7 @@ void Debugger::RenderRegisters(Chip8& chip8)
 
 void Debugger::RenderMemory(Chip8& chip8)
 {
-    ImGui::Begin("CHIP-8 - Memory", &showMemory);
+    ImGui::Begin("CHIP-8 - Memory", &showMemory, ImGuiWindowFlags_NoMove);
     
     static int memoryStart = 0x200; // Start at ROM area
     static bool followPC = false;
@@ -351,7 +382,7 @@ void Debugger::RenderMemory(Chip8& chip8)
 
 void Debugger::RenderControls(Chip8& chip8)
 {
-    ImGui::Begin("CHIP-8 - Controls", &showControls, ImGuiWindowFlags_NoResize);
+    ImGui::Begin("CHIP-8 - Controls", &showControls, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
     
     static bool isPaused = false;
     static bool stepMode = false;
@@ -401,7 +432,7 @@ void Debugger::RenderControls(Chip8& chip8)
 
 void Debugger::RenderKeyboard(Chip8& chip8)
 {
-    ImGui::Begin("CHIP-8 - Keyboard", &showKeyboard, ImGuiWindowFlags_NoResize);
+    ImGui::Begin("CHIP-8 - Keyboard", &showKeyboard, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
     
     ImGui::SeparatorText("Keypad Layout");
     ImGui::TextWrapped("CHIP-8 Keypad layout and PC keyboard mapping:");
@@ -470,7 +501,7 @@ void Debugger::RenderKeyboard(Chip8& chip8)
 
 void Debugger::RenderDisassembly(Chip8& chip8)
 {
-    ImGui::Begin("CHIP-8 - CPU Disassembler", &showDisassembly);
+    ImGui::Begin("CHIP-8 - CPU Disassembler", &showDisassembly, ImGuiWindowFlags_NoMove);
     
     static bool followPC = true;
     ImGui::Checkbox("Follow PC", &followPC);
@@ -528,45 +559,39 @@ void Debugger::RenderDisassembly(Chip8& chip8)
 
 void Debugger::RenderDisplay(Chip8& chip8)
 {
-    ImGui::Begin("CHIP-8 - Display", &showDisplay, ImGuiWindowFlags_NoResize);
+    ImGui::Begin("CHIP-8 - Display", &showDisplay, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
     
     // Convert CHIP-8 display to RGBA texture
     uint32_t pixels[64 * 32];
     for (int i = 0; i < 64 * 32; i++) {
-        // CHIP-8 uses 1-bit per pixel, convert to RGBA
-        pixels[i] = chip8.display[i] ? 0xFFFFFFFF : 0xFF000000; // White or Black
+        // CHIP-8 uses 1-bit per pixel, convert to ABGR format (0xAABBGGRR)
+        pixels[i] = chip8.display[i] ? 0xFFFFFFFF : 0xFF000000; // White (ABGR) or Black (ABGR)
     }
     
     // Update the texture
     SDL_UpdateTexture(displayTexture, nullptr, pixels, 64 * sizeof(uint32_t));
     
+    // Set texture filtering to nearest neighbor for pixel-perfect rendering
+    SDL_SetTextureScaleMode(displayTexture, SDL_ScaleModeNearest);
+    
     // Get texture as ImGui texture ID
     ImTextureID textureID = (ImTextureID)(intptr_t)displayTexture;
     
-    // Calculate display size (maintain aspect ratio)
-    ImVec2 windowSize = ImGui::GetContentRegionAvail();
-    float aspectRatio = 64.0f / 32.0f; // CHIP-8 aspect ratio
-    
-    ImVec2 displaySize;
-    if (windowSize.x / aspectRatio <= windowSize.y) {
-        displaySize.x = windowSize.x;
-        displaySize.y = windowSize.x / aspectRatio;
-    } else {
-        displaySize.y = windowSize.y;
-        displaySize.x = windowSize.y * aspectRatio;
-    }
+    // Fixed display size for consistent layout
+    ImVec2 displaySize(512, 256); // 8x scale of 64x32
     
     // Center the display
-    ImVec2 cursorPos = ImGui::GetCursorPos();
+    ImVec2 windowSize = ImGui::GetContentRegionAvail();
     ImVec2 centerPos = ImVec2(
-        cursorPos.x + (windowSize.x - displaySize.x) * 0.5f,
-        cursorPos.y + (windowSize.y - displaySize.y) * 0.5f
+        (windowSize.x - displaySize.x) * 0.5f,
+        (windowSize.y - displaySize.y) * 0.5f
     );
     
-    ImGui::SetCursorPos(centerPos);
+    if (centerPos.x > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centerPos.x);
+    if (centerPos.y > 0) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + centerPos.y);
     
     // Render the display with nearest neighbor filtering for pixel-perfect scaling
-    ImGui::Image(textureID, displaySize);
+    ImGui::Image(textureID, displaySize, ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(0, 0, 0, 0));
     
     ImGui::End();
 }
