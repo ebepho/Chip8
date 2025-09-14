@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <fstream>
+#include <string>
 #include "const.h"
 
 class Chip8
@@ -58,7 +59,7 @@ public:
 
 	// CPU Loop
 	void Cycle();
-	void DecodeAndExecute(uint16_t opcode);
+	std::string DecodeAndExecute(uint16_t opcode);
 	
     // Instructions **************************************************************
 	// Clear screen

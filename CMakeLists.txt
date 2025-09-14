@@ -47,7 +47,6 @@ add_executable(chip8
     src/chip8.cpp
     src/instructions.cpp
     UI/graphics.cpp
-    UI/debugger.cpp
 )
 
 # Add project header directories

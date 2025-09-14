@@ -1,6 +1,8 @@
 #include "chip8.h"
 #include <fstream>
 #include <iostream>
+#include <sstream>
+#include <iomanip>
 
 Chip8::Chip8()
 {
@@ -56,13 +58,11 @@ void Chip8::Cycle()
 	uint16_t opcode = memory[pc] << 8 | memory[pc + 1];
 	pc += 2;
 
-	// Decode:  the instruction to find out what the emulator should do
-	// Excute: the instruction and do what it tells you
 	DecodeAndExecute(opcode);
 }
 
 
-void Chip8::DecodeAndExecute(uint16_t opcode)
+std::string Chip8::DecodeAndExecute(uint16_t opcode)
 {
 	uint8_t  op  = (opcode & 0xF000) >> 12; // 1st nibble - Tells you what kind of instruction it is
 	uint8_t  x   = (opcode & 0x0F00) >> 8;  // 2nd nibble - Used to look up one of the 16 registers (VX) from V0 through VF
@@ -72,30 +72,45 @@ void Chip8::DecodeAndExecute(uint16_t opcode)
 	uint8_t  nn  = opcode & 0x00FF;   // lowest 8 bits  - Used as an 8-bit immediate value for some instructions
 	uint16_t nnn = opcode & 0x0FFF;   // lowest 12 bits - Used as a 12-bit address for some instructions
 
+	std::stringstream ss;
+
 	switch (op)
 	{
 		case 0x0:
 			OP_00E0();
+			if (opcode == 0x00E0) return "CLS";
+			ss << "SYS 0x" << std::hex << std::uppercase << nnn;
 			break;
 
 		case 0x1: 
 			OP_1NNN(nnn); 
+			ss << "JP 0x" << std::hex << std::uppercase << nnn;
 			break;
 
 		case 0x6:
 			OP_6XNN(x, nn);
+			ss << "LD V" << std::hex << std::uppercase << (int)x << ", 0x" << std::hex << std::uppercase << (int)nn << " (" << std::dec << (int)nn << ")";
 			break;
 
 		case 0x7: 
 			OP_7XNN(x, nn); 
+			ss << "ADD V" << std::hex << std::uppercase << (int)x << ", 0x" << std::hex << std::uppercase << (int)nn << " (" << std::dec << (int)nn << ")";
 			break;
 
 		case 0xA:
 			OP_ANNN(nnn); 
+			ss << "LD I, 0x" << std::hex << std::uppercase << nnn;
 			break;
 		
 		case 0xD: 
 			OP_DXYN(x, y, n);
+			ss << "DRW V" << std::hex << std::uppercase << (int)x << ", V" << std::hex << std::uppercase << (int)y << ", 0x" << std::hex << std::uppercase << (int)n << " (" << std::dec << (int)n << ")";
+			break;
+			
+		default:
+			ss << "UNK 0x" << std::hex << std::uppercase << std::setfill('0') << std::setw(4) << opcode;
 			break;
 	}
+	
+	return ss.str();
 }

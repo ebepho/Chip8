@@ -59,7 +59,7 @@ make
 ./chip8 <ROM_file>
 
 # With custom settings
-./chip8 [ROM_file] [scale] [cycleDelay]
+./chip8 [ROM_file] [cycleDelay]
 ```
 
 **Parameters:**
@@ -104,8 +104,6 @@ The project is organized into several components:
 - `src/instructions.cpp` - CHIP-8 instruction set implementation  
 - `src/main.cpp` - Main emulation loop with debugger integration
 - `UI/graphics.cpp` - SDL2 graphics handling and ImGui rendering
-- `UI/debugger.cpp` - Complete ImGui debugging interface implementation
-- `UI/debugger.h` - Debugger class definition with control state management
 - `include/chip8.h` - CHIP-8 system header with core definitions
 - `include/const.h` - System constants and configuration
 - `roms/` - Collection of CHIP-8 ROM files for testing
@@ -131,7 +129,6 @@ The project is organized into several components:
 - Thread-safe state management
 
 ## Technical Details
-
 - **Display**: 64x32 pixels, black and white
 - **Memory**: 4KB (4096 bytes) 
 - **Registers**: 16 general-purpose 8-bit registers (V0-VF)
@@ -142,17 +139,3 @@ The project is organized into several components:
 - **UI Framework**: ImGui with SDL2 backend for cross-platform compatibility
 
 The debugger uses ImGui for the interface, providing a modern, responsive debugging experience that runs alongside the emulator in real-time. The interface is designed to mimic professional debugging tools with organized windows and comprehensive system state visualization.
-
-## ROM Compatibility
-
-The emulator has been tested with various CHIP-8 ROMs including:
-- PONG - Classic paddle game
-- INVADERS - Space Invaders clone  
-- TETRIS - Tetris implementation
-- BRIX - Breakout clone
-- IBM LOGO - IBM logo display
-- And many more in the `roms/` directory
-
-## Contributing
-
-Feel free to contribute improvements, bug fixes, or additional features. The codebase is well-organized and documented for easy understanding and modification.
