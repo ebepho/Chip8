@@ -2,8 +2,8 @@
 
 This project is a CHIP-8 emulator with a comprehensive debugging interface built using ImGui. The debugger provides real-time visualization of the CPU state, memory, registers, and allows interactive debugging similar to professional development tools.
 
-![CHIP-8 Debugger Interface](screenshot.png)
-*Professional debugging interface with organized window layout*
+<img width="2386" height="1634" alt="image" src="https://github.com/user-attachments/assets/d1247955-6dc1-4764-a634-13048ef12e54" />
+
 
 ## Features
 
@@ -65,7 +65,7 @@ make
 **Parameters:**
 - `ROM_file`: Path to CHIP-8 ROM (optional - ROM selector will appear if not provided)
 - `scale`: Display scale factor (default: 10)
-- `cycleDelay`: Milliseconds per CPU cycle for emulation speed (default: 1.4)
+- `cycleDelay`: Milliseconds per CPU cycle for emulation speed (default: 1.4, ~700 instructions/s)
 
 ## Controls
 
